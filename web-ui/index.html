@@ -1,0 +1,305 @@
+// index.html
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Execution Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 40px;
+        }
+
+        .CodeMirror {
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .output-container {
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .spinner-border {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="mb-4">Code Execution Platform</h1>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="language" class="form-label">Language</label>
+                <select id="language" class="form-select">
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="ruby">Ruby</option>
+                    <option value="go">Go</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="code-editor" class="form-label">Code</label>
+                <textarea id="code-editor"></textarea>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="input" class="form-label">Input (Optional)</label>
+                <textarea id="input" class="form-control" rows="3"></textarea>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <button id="run-btn" class="btn btn-primary">
+                    <span id="run-spinner" class="spinner-border spinner-border-sm" role="status"
+                        aria-hidden="true"></span>
+                    Run Code
+                </button>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="output" class="form-label">Output</label>
+                <div id="output" class="output-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/ruby/ruby.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/go/go.min.js"></script>
+    <script>
+        // Initialize CodeMirror
+        const codeEditor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            lineNumbers: true,
+            mode: 'python',
+            theme: 'dracula',
+            indentUnit: 4,
+            tabSize: 4,
+            indentWithTabs: false,
+            smartIndent: true,
+            lineWrapping: true,
+            extraKeys: {
+                "Tab": function (cm) {
+                    if (cm.somethingSelected()) {
+                        cm.indentSelection("add");
+                    } else {
+                        cm.replaceSelection("    ", "end", "+input");
+                    }
+                }
+            }
+        });
+
+        // Sample code for each language
+        const sampleCode = {
+            python: `# Python Example
+print("Hello, World!")
+name = input("Enter your name: ")
+print(f"Hello, {name}!")
+
+# Calculate the sum of numbers from 1 to 10
+total = sum(range(1, 11))
+print(f"Sum of numbers from 1 to 10: {total}")`,
+
+            javascript: `// JavaScript Example
+console.log("Hello, World!");
+
+// Read input
+const readline = require('readline').createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+readline.question('Enter your name: ', name => {
+  console.log(\`Hello, \${name}!\`);
+  
+  // Calculate the sum of numbers from 1 to 10
+  let total = 0;
+  for (let i = 1; i <= 10; i++) {
+    total += i;
+  }
+  console.log(\`Sum of numbers from 1 to 10: \${total}\`);
+  
+  readline.close();
+});`,
+
+            java: `// Java Example
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+        
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter your name: ");
+        String name = scanner.nextLine();
+        System.out.println("Hello, " + name + "!");
+        
+        // Calculate the sum of numbers from 1 to 10
+        int total = 0;
+        for (int i = 1; i <= 10; i++) {
+            total += i;
+        }
+        System.out.println("Sum of numbers from 1 to 10: " + total);
+        
+        scanner.close();
+    }
+}`,
+
+            cpp: `// C++ Example
+#include <iostream>
+#include <string>
+
+int main() {
+    std::cout << "Hello, World!" << std::endl;
+    
+    std::string name;
+    std::cout << "Enter your name: ";
+    std::getline(std::cin, name);
+    std::cout << "Hello, " << name << "!" << std::endl;
+    
+    // Calculate the sum of numbers from 1 to 10
+    int total = 0;
+    for (int i = 1; i <= 10; i++) {
+        total += i;
+    }
+    std::cout << "Sum of numbers from 1 to 10: " << total << std::endl;
+    
+    return 0;
+}`,
+
+            ruby: `# Ruby Example
+puts "Hello, World!"
+
+print "Enter your name: "
+name = gets.chomp
+puts "Hello, #{name}!"
+
+# Calculate the sum of numbers from 1 to 10
+total = (1..10).sum
+puts "Sum of numbers from 1 to 10: #{total}"`,
+
+            go: `// Go Example
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	fmt.Println("Hello, World!")
+	
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter your name: ")
+	name, _ := reader.ReadString('\\n')
+	name = strings.TrimSpace(name)
+	fmt.Printf("Hello, %s!\\n", name)
+	
+	// Calculate the sum of numbers from 1 to 10
+	total := 0
+	for i := 1; i <= 10; i++ {
+		total += i
+	}
+	fmt.Printf("Sum of numbers from 1 to 10: %d\\n", total)
+}`
+        };
+
+        // Language mode mapping
+        const languageModes = {
+            python: 'python',
+            javascript: 'javascript',
+            java: 'text/x-java',
+            cpp: 'text/x-c++src',
+            ruby: 'ruby',
+            go: 'go'
+        };
+
+        // Set initial code sample
+        codeEditor.setValue(sampleCode.python);
+
+        // Handle language change
+        document.getElementById('language').addEventListener('change', function () {
+            const language = this.value;
+            codeEditor.setOption('mode', languageModes[language]);
+            codeEditor.setValue(sampleCode[language]);
+        });
+
+        // Handle code execution
+        document.getElementById('run-btn').addEventListener('click', async function () {
+            const language = document.getElementById('language').value;
+            const code = codeEditor.getValue();
+            const input = document.getElementById('input').value;
+            const outputElement = document.getElementById('output');
+            const runSpinner = document.getElementById('run-spinner');
+
+            // Show loading spinner
+            runSpinner.style.display = 'inline-block';
+            this.disabled = true;
+            outputElement.innerText = 'Running code...';
+
+            try {
+                const response = await fetch('http://localhost:3000/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        language,
+                        code,
+                        input
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    if (result.status === 'success') {
+                        outputElement.innerText = result.output;
+                    } else {
+                        outputElement.innerText = `Error (Exit code: ${result.exitCode}):\n${result.output}`;
+                    }
+                } else {
+                    outputElement.innerText = `Error: ${result.error || 'Failed to execute code'}`;
+                }
+            } catch (error) {
+                outputElement.innerText = `Error: ${error.message}`;
+            } finally {
+                // Hide loading spinner
+                runSpinner.style.display = 'none';
+                this.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

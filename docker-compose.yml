@@ -1,0 +1,90 @@
+# Docker Compose configuration for the code execution service
+version: '3.8'
+
+services:
+  # API Server
+  api-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./server:/usr/src/app  # Mount local server directory to container
+    environment:
+      - NODE_ENV=development  # Change to development mode
+      - MAX_CONCURRENT_EXECUTIONS=5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - code-execution-network
+
+  # Python execution environment
+  code-execution-python:
+    build:
+      context: ./languages/python
+      dockerfile: Dockerfile
+    image: code-execution-python:latest
+    # No ports exposed - containers are accessed via Docker API
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # JavaScript execution environment
+  code-execution-javascript:
+    build:
+      context: ./languages/javascript
+      dockerfile: Dockerfile
+    image: code-execution-javascript:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # Java execution environment
+  code-execution-java:
+    build:
+      context: ./languages/java
+      dockerfile: Dockerfile
+    image: code-execution-java:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # C++ execution environment
+  code-execution-cpp:
+    build:
+      context: ./languages/cpp
+      dockerfile: Dockerfile
+    image: code-execution-cpp:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # Ruby execution environment
+  code-execution-ruby:
+    build:
+      context: ./languages/ruby
+      dockerfile: Dockerfile
+    image: code-execution-ruby:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # Go execution environment
+  code-execution-go:
+    build:
+      context: ./languages/go
+      dockerfile: Dockerfile
+    image: code-execution-go:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+networks:
+  code-execution-network:
+    driver: bridge
