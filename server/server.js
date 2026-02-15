@@ -51,32 +51,32 @@ const supportedLanguages = {
   python: {
     image: 'code-execution-python:latest',
     fileExtension: '.py',
-    command: ['python', '/code/script.py']
+    command: ['python', 'script.py']  // Working dir is set, use relative paths
   },
   javascript: {
     image: 'code-execution-javascript:latest',
     fileExtension: '.js',
-    command: ['node', '/code/script.js']
+    command: ['node', 'script.js']  // Working dir is set, use relative paths
   },
   java: {
     image: 'code-execution-java:latest',
     fileExtension: '.java',
-    command: ['sh', '-c', 'cd /code && javac Main.java && java Main']
+    command: ['sh', '-c', 'javac Main.java && java Main']  // Already in working dir
   },
   cpp: {
     image: 'code-execution-cpp:latest',
     fileExtension: '.cpp',
-    command: ['sh', '-c', 'cd /code && g++ -o program main.cpp && ./program']
+    command: ['sh', '-c', 'g++ -o program main.cpp && ./program']  // Already in working dir
   },
   ruby: {
     image: 'code-execution-ruby:latest',
     fileExtension: '.rb',
-    command: ['ruby', '/code/script.rb']
+    command: ['ruby', 'script.rb']  // Working dir is set, use relative paths
   },
   go: {
     image: 'code-execution-go:latest',
     fileExtension: '.go',
-    command: ['go', 'run', '/code/main.go']
+    command: ['go', 'run', 'main.go']  // Working dir is set, use relative paths
   }
 };
 
@@ -402,7 +402,7 @@ async function executeCodeInteractive(language, code, socket) {
   }
 
   const executionId = uuidv4();
-  const workDir = path.join('/tmp', executionId);
+  const workDir = path.join('/workdir', executionId);  // Use shared volume
   let container = null;
   let stream = null;
 
@@ -421,33 +421,9 @@ async function executeCodeInteractive(language, code, socket) {
 
     socket.emit('output', { data: '🚀 Starting execution...\n\n' });
 
-    // Create a temporary Dockerfile
-    const tempDockerfilePath = path.join(workDir, 'Dockerfile');
-    const dockerfileContent = `
-      FROM ${baseImage}
-      COPY ${fileName} /code/${fileName}
-      USER coderunner
-      WORKDIR /code
-    `;
-    await fs.writeFile(tempDockerfilePath, dockerfileContent);
-
-    // Build temporary image
-    const tmpImageName = `code-exec-tmp-${executionId}`;
-    await new Promise((resolve, reject) => {
-      docker.buildImage({
-        context: workDir,
-        src: ['Dockerfile', fileName]
-      }, { t: tmpImageName }, (err, stream) => {
-        if (err) return reject(err);
-        docker.modem.followProgress(stream, (err, res) => {
-          if (err) return reject(err);
-          resolve(res);
-        });
-      });
-    });
-
+    // NO IMAGE BUILDING! Use volume mounts instead for speed
     const containerOptions = {
-      Image: tmpImageName,
+      Image: baseImage,  // Use pre-built base image directly
       Cmd: supportedLanguages[language].command,
       HostConfig: {
         Memory: 100 * 1024 * 1024,
@@ -457,14 +433,22 @@ async function executeCodeInteractive(language, code, socket) {
         NetworkMode: 'none',
         Privileged: false,
         SecurityOpt: ['no-new-privileges'],
-        CapDrop: ['ALL']
+        CapDrop: ['ALL'],
+        // Mount the shared volume with the code directory
+        Mounts: [{
+          Type: 'volume',
+          Source: 'code_execution_server_code-workdir',
+          Target: '/workdir',
+          ReadOnly: false
+        }]
       },
       OpenStdin: true,
       StdinOnce: false,
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
-      Tty: false
+      Tty: false,
+      WorkingDir: `/workdir/${executionId}`  // Set working directory to the code directory
     };
 
     container = await docker.createContainer(containerOptions);
@@ -506,12 +490,6 @@ async function executeCodeInteractive(language, code, socket) {
 
     stream.end();
     await container.remove();
-
-    try {
-      await docker.getImage(tmpImageName).remove();
-    } catch (err) {
-      console.error(`Error removing temp image: ${err.message}`);
-    }
 
     socket.emit('execution-complete', {
       status: exitData.StatusCode === 0 ? 'success' : 'error',

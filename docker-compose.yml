@@ -12,6 +12,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./server:/usr/src/app  # Mount local server directory to container
+      - code-workdir:/workdir  # Shared volume for code execution
     environment:
       - NODE_ENV=development  # Change to development mode
       - MAX_CONCURRENT_EXECUTIONS=5
@@ -88,3 +89,7 @@ services:
 networks:
   code-execution-network:
     driver: bridge
+
+volumes:
+  code-workdir:
+    driver: local

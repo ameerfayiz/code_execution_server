@@ -12,7 +12,8 @@
       "Bash(test-ruby-gets.rb:*)",
       "Bash(xargs:*)",
       "Bash(node:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(docker-compose:*)"
     ]
   }
 }
