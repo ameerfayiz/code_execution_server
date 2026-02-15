@@ -96,6 +96,16 @@ services:
     networks:
       - code-execution-network
 
+  # PHP execution environment
+  code-execution-php:
+    build:
+      context: ./languages/php
+      dockerfile: Dockerfile
+    image: code-execution-php:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
 networks:
   code-execution-network:
     driver: bridge

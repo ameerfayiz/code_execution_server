@@ -82,6 +82,11 @@ const supportedLanguages = {
     image: 'code-execution-dart:latest',
     fileExtension: '.dart',
     command: ['dart', 'run', 'main.dart']  // Working dir is set, use relative paths
+  },
+  php: {
+    image: 'code-execution-php:latest',
+    fileExtension: '.php',
+    command: ['php', 'script.php']  // Working dir is set, use relative paths
   }
 };
 
@@ -209,6 +214,8 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'cat /code/input.txt | node /code/script.js'];
       } else if (language === 'dart') {
         cmd = ['sh', '-c', 'cat /code/input.txt | dart run /code/main.dart'];
+      } else if (language === 'php') {
+        cmd = ['sh', '-c', 'cat /code/input.txt | php /code/script.php'];
       }
     }
 
@@ -354,7 +361,8 @@ function detectInteractiveCode(language, code) {
     cpp: /\bcin\b|\bgetline\b|\bscanf\b/i,
     ruby: /\bgets\b|\breadline\b/i,
     go: /\bScan\b|\bReader\.ReadString\b|\bReader\.Read\b/i,
-    dart: /\breadLineSync\b|\bstdin\.read/i
+    dart: /\breadLineSync\b|\bstdin\.read/i,
+    php: /\bfgets\b|\breadline\b|\bSTDIN\b/i
   };
 
   return patterns[language] && patterns[language].test(code);
