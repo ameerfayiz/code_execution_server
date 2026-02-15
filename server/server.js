@@ -7,10 +7,21 @@ const fs = require('fs').promises;
 const path = require('path');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Initialize express app
 const app = express();
 const port = process.env.PORT || 3000;
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
 
 // Middleware
 app.use(cors({
@@ -20,6 +31,9 @@ app.use(cors({
 }));
 
 app.use(bodyParser.json());
+
+// Serve static files from web-ui directory
+app.use(express.static(path.join(__dirname, '../web-ui')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -47,13 +61,12 @@ const supportedLanguages = {
   java: {
     image: 'code-execution-java:latest',
     fileExtension: '.java',
-    command: ['bash', '-c', 'cd /code && javac Main.java && java Main']
+    command: ['sh', '-c', 'cd /code && javac Main.java && java Main']
   },
   cpp: {
     image: 'code-execution-cpp:latest',
     fileExtension: '.cpp',
-    // command: ['bash', '-c', 'ls -la /code && echo "Compiling..." && g++ -v -o /code/program /code/main.cpp && echo "Running..." && /code/program']
-    command: ['bash', '-c', 'cd /code && g++ -o program main.cpp && ./program']
+    command: ['sh', '-c', 'cd /code && g++ -o program main.cpp && ./program']
   },
   ruby: {
     image: 'code-execution-ruby:latest',
@@ -360,8 +373,169 @@ app.get('/languages', (req, res) => {
   res.json(Object.keys(supportedLanguages));
 });
 
+// Socket.IO connection handler for interactive execution
+io.on('connection', (socket) => {
+  console.log(`[${new Date().toISOString()}] Client connected: ${socket.id}`);
+
+  socket.on('execute-interactive', async (data) => {
+    const { language, code } = data;
+    console.log(`[${new Date().toISOString()}] Interactive execution request - Language: ${language}, Socket: ${socket.id}`);
+
+    try {
+      await executeCodeInteractive(language, code, socket);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Interactive execution error:`, error);
+      socket.emit('error', { message: error.message });
+      socket.emit('execution-complete', { status: 'error' });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[${new Date().toISOString()}] Client disconnected: ${socket.id}`);
+  });
+});
+
+// Interactive code execution function with streaming
+async function executeCodeInteractive(language, code, socket) {
+  if (!supportedLanguages[language]) {
+    throw new Error(`Unsupported language: ${language}`);
+  }
+
+  const executionId = uuidv4();
+  const workDir = path.join('/tmp', executionId);
+  let container = null;
+  let stream = null;
+
+  try {
+    await fs.mkdir(workDir, { recursive: true });
+
+    const fileName = language === 'java' ? 'Main.java' :
+      language === 'cpp' ? 'main.cpp' :
+        language === 'go' ? 'main.go' :
+          `script${supportedLanguages[language].fileExtension}`;
+
+    const filePath = path.join(workDir, fileName);
+    await fs.writeFile(filePath, code);
+
+    const baseImage = supportedLanguages[language].image;
+
+    socket.emit('output', { data: '🚀 Starting execution...\n\n' });
+
+    // Create a temporary Dockerfile
+    const tempDockerfilePath = path.join(workDir, 'Dockerfile');
+    const dockerfileContent = `
+      FROM ${baseImage}
+      COPY ${fileName} /code/${fileName}
+      USER coderunner
+      WORKDIR /code
+    `;
+    await fs.writeFile(tempDockerfilePath, dockerfileContent);
+
+    // Build temporary image
+    const tmpImageName = `code-exec-tmp-${executionId}`;
+    await new Promise((resolve, reject) => {
+      docker.buildImage({
+        context: workDir,
+        src: ['Dockerfile', fileName]
+      }, { t: tmpImageName }, (err, stream) => {
+        if (err) return reject(err);
+        docker.modem.followProgress(stream, (err, res) => {
+          if (err) return reject(err);
+          resolve(res);
+        });
+      });
+    });
+
+    const containerOptions = {
+      Image: tmpImageName,
+      Cmd: supportedLanguages[language].command,
+      HostConfig: {
+        Memory: 100 * 1024 * 1024,
+        MemorySwap: 100 * 1024 * 1024,
+        NanoCpus: 1 * 1000000000,
+        PidsLimit: 50,
+        NetworkMode: 'none',
+        Privileged: false,
+        SecurityOpt: ['no-new-privileges'],
+        CapDrop: ['ALL']
+      },
+      OpenStdin: true,
+      StdinOnce: false,
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: false
+    };
+
+    container = await docker.createContainer(containerOptions);
+    await container.start();
+    stream = await container.attach({ stream: true, stdin: true, stdout: true, stderr: true, hijack: true });
+
+    const stdout = new require('stream').PassThrough();
+    const stderr = new require('stream').PassThrough();
+    docker.modem.demuxStream(stream, stdout, stderr);
+
+    stdout.on('data', (chunk) => {
+      socket.emit('output', { data: chunk.toString('utf8') });
+    });
+
+    stderr.on('data', (chunk) => {
+      socket.emit('output', { data: chunk.toString('utf8'), type: 'stderr' });
+    });
+
+    socket.on('input', (inputData) => {
+      if (stream && !stream.destroyed) {
+        stream.write(inputData.data + '\n');
+      }
+    });
+
+    const executionTimeout = setTimeout(async () => {
+      try {
+        const containerInfo = await container.inspect();
+        if (containerInfo.State.Running) {
+          await container.stop();
+          socket.emit('output', { data: '\n⏱️ Execution timeout (5 minutes)\n', type: 'error' });
+        }
+      } catch (err) {
+        console.error('Error stopping container:', err);
+      }
+    }, 300000);
+
+    const exitData = await container.wait();
+    clearTimeout(executionTimeout);
+
+    stream.end();
+    await container.remove();
+
+    try {
+      await docker.getImage(tmpImageName).remove();
+    } catch (err) {
+      console.error(`Error removing temp image: ${err.message}`);
+    }
+
+    socket.emit('execution-complete', {
+      status: exitData.StatusCode === 0 ? 'success' : 'error',
+      exitCode: exitData.StatusCode,
+      executionId
+    });
+
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Error in interactive execution:`, error);
+    throw error;
+  } finally {
+    if (stream && !stream.destroyed) {
+      stream.end();
+    }
+    try {
+      await fs.rm(workDir, { recursive: true, force: true });
+    } catch (error) {
+      console.error(`Error cleaning up: ${error.message}`);
+    }
+  }
+}
+
 // Start server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Code execution server listening at http://localhost:${port}`);
 });
 

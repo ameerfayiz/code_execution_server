@@ -36,6 +36,24 @@
         .spinner-border {
             display: none;
         }
+
+        .interactive-input-container {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .interactive-input {
+            font-family: monospace;
+        }
+
+        .output-container.running {
+            border-color: #0d6efd;
+            background-color: #f0f7ff;
+        }
+
+        .stderr {
+            color: #dc3545;
+        }
     </style>
 </head>
 
@@ -66,18 +84,12 @@
 
         <div class="row mb-3">
             <div class="col-12">
-                <label for="input" class="form-label">Input (Optional)</label>
-                <textarea id="input" class="form-control" rows="3"></textarea>
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-12">
                 <button id="run-btn" class="btn btn-primary">
                     <span id="run-spinner" class="spinner-border spinner-border-sm" role="status"
                         aria-hidden="true"></span>
-                    Run Code
+                    Run Code (Interactive)
                 </button>
+                <button id="stop-btn" class="btn btn-danger ms-2" style="display: none;">Stop</button>
             </div>
         </div>
 
@@ -85,10 +97,18 @@
             <div class="col-12">
                 <label for="output" class="form-label">Output</label>
                 <div id="output" class="output-container"></div>
+                <div class="interactive-input-container" id="input-container">
+                    <div class="input-group">
+                        <input type="text" id="interactive-input" class="form-control interactive-input"
+                               placeholder="Type input and press Enter..." autocomplete="off">
+                        <button class="btn btn-outline-primary" id="send-input-btn">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
@@ -196,10 +216,14 @@ int main() {
 }`,
 
             ruby: `# Ruby Example
+# Disable output buffering for interactive input
+STDOUT.sync = true
+
 puts "Hello, World!"
 
 print "Enter your name: "
-name = gets.chomp
+STDOUT.flush
+name = $stdin.gets.chomp
 puts "Hello, #{name}!"
 
 # Calculate the sum of numbers from 1 to 10
@@ -254,51 +278,139 @@ func main() {
             codeEditor.setValue(sampleCode[language]);
         });
 
+        // Initialize Socket.IO
+        const socket = io();
+        let isExecuting = false;
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+
+        socket.on('output', (data) => {
+            const outputElement = document.getElementById('output');
+            const outputText = data.data;
+
+            if (data.type === 'stderr') {
+                const span = document.createElement('span');
+                span.className = 'stderr';
+                span.textContent = outputText;
+                outputElement.appendChild(span);
+            } else {
+                outputElement.appendChild(document.createTextNode(outputText));
+            }
+
+            // Auto-scroll to bottom
+            outputElement.scrollTop = outputElement.scrollHeight;
+        });
+
+        socket.on('execution-complete', (data) => {
+            isExecuting = false;
+            const outputElement = document.getElementById('output');
+            const runBtn = document.getElementById('run-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const runSpinner = document.getElementById('run-spinner');
+            const inputContainer = document.getElementById('input-container');
+
+            outputElement.classList.remove('running');
+            inputContainer.style.display = 'none';
+            runSpinner.style.display = 'none';
+            runBtn.disabled = false;
+            stopBtn.style.display = 'none';
+
+            const statusMsg = data.status === 'success'
+                ? '\n✅ Execution completed successfully'
+                : `\n❌ Execution failed (exit code: ${data.exitCode})`;
+
+            outputElement.appendChild(document.createTextNode(statusMsg));
+            outputElement.scrollTop = outputElement.scrollHeight;
+        });
+
+        socket.on('error', (data) => {
+            const outputElement = document.getElementById('output');
+            outputElement.appendChild(document.createTextNode(`\n❌ Error: ${data.message}\n`));
+            isExecuting = false;
+        });
+
         // Handle code execution
-        document.getElementById('run-btn').addEventListener('click', async function () {
+        document.getElementById('run-btn').addEventListener('click', function () {
             const language = document.getElementById('language').value;
             const code = codeEditor.getValue();
-            const input = document.getElementById('input').value;
             const outputElement = document.getElementById('output');
             const runSpinner = document.getElementById('run-spinner');
+            const stopBtn = document.getElementById('stop-btn');
+            const inputContainer = document.getElementById('input-container');
 
-            // Show loading spinner
+            // Validate code
+            if (!code.trim()) {
+                outputElement.innerText = '❌ Error: Please enter some code to execute';
+                return;
+            }
+
+            if (isExecuting) {
+                return;
+            }
+
+            // Clear output and setup UI
+            outputElement.textContent = '';
+            outputElement.classList.add('running');
             runSpinner.style.display = 'inline-block';
             this.disabled = true;
-            outputElement.innerText = 'Running code...';
+            stopBtn.style.display = 'inline-block';
+            inputContainer.style.display = 'block';
+            isExecuting = true;
 
-            try {
-                const response = await fetch('http://localhost:3000/execute', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        language,
-                        code,
-                        input
-                    })
-                });
+            // Emit execution request
+            socket.emit('execute-interactive', { language, code });
+        });
 
-                const result = await response.json();
+        // Handle stop button
+        document.getElementById('stop-btn').addEventListener('click', function () {
+            socket.disconnect();
+            setTimeout(() => socket.connect(), 100);
 
-                if (response.ok) {
-                    if (result.status === 'success') {
-                        outputElement.innerText = result.output;
-                    } else {
-                        outputElement.innerText = `Error (Exit code: ${result.exitCode}):\n${result.output}`;
-                    }
-                } else {
-                    outputElement.innerText = `Error: ${result.error || 'Failed to execute code'}`;
-                }
-            } catch (error) {
-                outputElement.innerText = `Error: ${error.message}`;
-            } finally {
-                // Hide loading spinner
-                runSpinner.style.display = 'none';
-                this.disabled = false;
+            const outputElement = document.getElementById('output');
+            outputElement.appendChild(document.createTextNode('\n\n⏹️ Execution stopped by user\n'));
+
+            isExecuting = false;
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('run-spinner').style.display = 'none';
+            this.style.display = 'none';
+            document.getElementById('input-container').style.display = 'none';
+            outputElement.classList.remove('running');
+        });
+
+        // Handle interactive input
+        const interactiveInput = document.getElementById('interactive-input');
+        const sendInputBtn = document.getElementById('send-input-btn');
+
+        function sendInput() {
+            if (!isExecuting) return;
+
+            const inputValue = interactiveInput.value;
+            if (inputValue !== '') {
+                socket.emit('input', { data: inputValue });
+
+                // Show input in output
+                const outputElement = document.getElementById('output');
+                outputElement.appendChild(document.createTextNode(inputValue + '\n'));
+                outputElement.scrollTop = outputElement.scrollHeight;
+
+                interactiveInput.value = '';
+            }
+        }
+
+        interactiveInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendInput();
             }
         });
+
+        sendInputBtn.addEventListener('click', sendInput);
     </script>
 </body>
 

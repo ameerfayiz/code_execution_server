@@ -5,8 +5,8 @@ services:
   # API Server
   api-server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./server/Dockerfile
     ports:
       - "3000:3000"
     volumes:

@@ -1,15 +1,18 @@
-# Server Dockerfile 
-FROM node:18-alpine 
- 
-# Create app directory 
-WORKDIR /usr/src/app 
- 
-# Install app dependencies 
-COPY package*.json ./ 
+# Server Dockerfile
+FROM node:18-alpine
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install app dependencies
+COPY ./server/package*.json ./
 RUN npm install
- 
-# Bundle app source 
-COPY . . 
+
+# Bundle app source
+COPY ./server .
+
+# Copy web-ui directory
+COPY ./web-ui ../web-ui 
  
 # Create non-root user 
 RUN addgroup -S coderunner && adduser -S coderunner -G coderunner 

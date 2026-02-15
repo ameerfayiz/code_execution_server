@@ -1,8 +1,8 @@
 # languages/java/Dockerfile
-FROM openjdk:17-slim
+FROM eclipse-temurin:17-jdk-alpine
 
 # Create a non-root user to run the code
-RUN groupadd -r coderunner && useradd -r -g coderunner coderunner
+RUN addgroup -S coderunner && adduser -S coderunner -G coderunner
 
 # Create code directory
 RUN mkdir /code && chown coderunner:coderunner /code
