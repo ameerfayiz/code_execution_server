@@ -328,7 +328,7 @@ async function executeCode(language, code, input = '') {
     const logs = await container.logs({ stdout: true, stderr: true });
 
     // Convert buffer to string and separate stdout and stderr
-    const output = cleanDockerLogs(logs);
+    const output = sanitizeExecutionOutput(language, cleanDockerLogs(logs));
 
     // Clean up container
     try {
@@ -392,6 +392,17 @@ function cleanDockerLogs(logs) {
   }
 
   return cleanedLogs;
+}
+
+function sanitizeExecutionOutput(language, output) {
+  if (!output || language !== 'octave') {
+    return output;
+  }
+
+  return output
+    .split('\n')
+    .filter((line) => !line.includes('error: ignoring const execution_exception& while preparing to exit'))
+    .join('\n');
 }
 
 // Add this function to detect if code likely contains interactive input
@@ -549,7 +560,11 @@ async function executeCodeInteractive(language, code, socket) {
     });
 
     stderr.on('data', (chunk) => {
-      socket.emit('output', { data: chunk.toString('utf8'), type: 'stderr' });
+      const sanitized = sanitizeExecutionOutput(language, chunk.toString('utf8'));
+      if (!sanitized || sanitized.trim().length === 0) {
+        return;
+      }
+      socket.emit('output', { data: sanitized, type: 'stderr' });
     });
 
     // Bind input to this execution only to prevent stray/stale writes.
