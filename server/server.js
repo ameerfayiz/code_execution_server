@@ -61,12 +61,12 @@ const supportedLanguages = {
   java: {
     image: 'code-execution-java:latest',
     fileExtension: '.java',
-    command: ['sh', '-c', 'javac Main.java && java Main']  // Already in working dir
+    command: ['sh', '-c', 'javac -d /tmp Main.java && java -cp /tmp Main']  // Compile to /tmp for write permissions
   },
   cpp: {
     image: 'code-execution-cpp:latest',
     fileExtension: '.cpp',
-    command: ['sh', '-c', 'g++ -o program main.cpp && ./program']  // Already in working dir
+    command: ['sh', '-c', 'g++ -o /tmp/program main.cpp && /tmp/program']  // Compile to /tmp for write permissions
   },
   ruby: {
     image: 'code-execution-ruby:latest',
@@ -189,9 +189,9 @@ async function executeCode(language, code, input = '') {
     if (hasInteractiveInput && input) {
       // Modify command to pipe input from the file
       if (language === 'java') {
-        cmd = ['sh', '-c', 'cd /code && javac Main.java && cat input.txt | java Main'];
+        cmd = ['sh', '-c', 'cd /code && javac -d /tmp Main.java && cat input.txt | java -cp /tmp Main'];
       } else if (language === 'cpp') {
-        cmd = ['sh', '-c', 'cd /code && g++ -o program main.cpp && cat input.txt | ./program'];
+        cmd = ['sh', '-c', 'cd /code && g++ -o /tmp/program main.cpp && cat input.txt | /tmp/program'];
       } else if (language === 'go') {
         // Fix for Go - ensure we're calling the shell correctly
         cmd = ['sh', '-c', 'cat /code/input.txt | go run /code/main.go'];
