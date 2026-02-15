@@ -74,6 +74,9 @@
                     <option value="go">Go</option>
                     <option value="dart">Dart</option>
                     <option value="php">PHP</option>
+                    <option value="rust">Rust</option>
+                    <option value="csharp">C#</option>
+                    <option value="scala">Scala</option>
                 </select>
             </div>
         </div>
@@ -318,7 +321,64 @@ for ($i = 1; $i <= 10; $i++) {
     $total += $i;
 }
 echo "Sum of numbers from 1 to 10: " . $total . "\\n";
-?>`
+?>`,
+
+            rust: `// Rust Example
+use std::io::{self, Write};
+
+fn main() {
+    println!("Hello, World!");
+    
+    print!("Enter your name: ");
+    io::stdout().flush().unwrap();
+    
+    let mut name = String::new();
+    io::stdin().read_line(&mut name).unwrap();
+    let name = name.trim();
+    println!("Hello, {}!", name);
+    
+    // Calculate the sum of numbers from 1 to 10
+    let total: i32 = (1..=10).sum();
+    println!("Sum of numbers from 1 to 10: {}", total);
+}`,
+
+            csharp: `// C# Example
+using System;
+
+class Program
+{
+    static void Main()
+    {
+        Console.WriteLine("Hello, World!");
+        
+        Console.Write("Enter your name: ");
+        string name = Console.ReadLine();
+        Console.WriteLine($"Hello, {name}!");
+        
+        // Calculate the sum of numbers from 1 to 10
+        int total = 0;
+        for (int i = 1; i <= 10; i++)
+        {
+            total += i;
+        }
+        Console.WriteLine($"Sum of numbers from 1 to 10: {total}");
+    }
+}`,
+
+            scala: `// Scala Example
+import scala.io.StdIn
+
+object Main extends App {
+  println("Hello, World!")
+  
+  print("Enter your name: ")
+  val name = StdIn.readLine()
+  println(s"Hello, $name!")
+  
+  // Calculate the sum of numbers from 1 to 10
+  val total = (1 to 10).sum
+  println(s"Sum of numbers from 1 to 10: $total")
+}`
         };
 
         // Language mode mapping
@@ -331,7 +391,10 @@ echo "Sum of numbers from 1 to 10: " . $total . "\\n";
             ruby: 'ruby',
             go: 'go',
             dart: 'text/x-dart',
-            php: 'text/x-php'
+            php: 'text/x-php',
+            rust: 'text/x-rustsrc',
+            csharp: 'text/x-csharp',
+            scala: 'text/x-scala'
         };
 
         // Set initial code sample

@@ -116,6 +116,36 @@ services:
     networks:
       - code-execution-network
 
+  # Rust execution environment
+  code-execution-rust:
+    build:
+      context: ./languages/rust
+      dockerfile: Dockerfile
+    image: code-execution-rust:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # C# execution environment
+  code-execution-csharp:
+    build:
+      context: ./languages/csharp
+      dockerfile: Dockerfile
+    image: code-execution-csharp:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
+  # Scala execution environment
+  code-execution-scala:
+    build:
+      context: ./languages/scala
+      dockerfile: Dockerfile
+    image: code-execution-scala:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
 networks:
   code-execution-network:
     driver: bridge

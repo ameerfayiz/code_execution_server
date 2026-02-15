@@ -92,6 +92,21 @@ const supportedLanguages = {
     image: 'code-execution-php:latest',
     fileExtension: '.php',
     command: ['php', 'script.php']  // Working dir is set, use relative paths
+  },
+  rust: {
+    image: 'code-execution-rust:latest',
+    fileExtension: '.rs',
+    command: ['sh', '-c', 'mkdir -p /tmp/rust-build && cp main.rs /tmp/rust-build/ && cd /tmp/rust-build && rustc main.rs -o /tmp/rust-build/program && /tmp/rust-build/program']  // Compile to /tmp for write permissions
+  },
+  csharp: {
+    image: 'code-execution-csharp:latest',
+    fileExtension: '.cs',
+    command: ['sh', '-c', 'mkdir -p /tmp/csharp-build && cp Program.cs /tmp/csharp-build/ && cd /tmp/csharp-build && dotnet new console --force --output . && rm Program.cs && cp /tmp/csharp-build/Program.cs . && dotnet build -o /tmp/output && dotnet /tmp/output/*.dll']  // Build to /tmp for write permissions
+  },
+  scala: {
+    image: 'code-execution-scala:latest',
+    fileExtension: '.scala',
+    command: ['sh', '-c', 'mkdir -p /tmp/scala-build && cp Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cd /tmp/scala-build && java -cp /tmp/scala-build:/usr/share/scala/lib/* Main']  // Compile with scalac then run with java
   }
 };
 
@@ -143,7 +158,10 @@ async function executeCode(language, code, input = '') {
         language === 'c' ? 'main.c' :
           language === 'go' ? 'main.go' :
             language === 'dart' ? 'main.dart' :
-              `script${supportedLanguages[language].fileExtension}`;
+              language === 'rust' ? 'main.rs' :
+                language === 'csharp' ? 'Program.cs' :
+                  language === 'scala' ? 'Main.scala' :
+                    `script${supportedLanguages[language].fileExtension}`;
 
     // Write code to a file
     const filePath = path.join(workDir, fileName);
@@ -224,13 +242,22 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'cat /code/input.txt | dart run /code/main.dart'];
       } else if (language === 'php') {
         cmd = ['sh', '-c', 'cat /code/input.txt | php /code/script.php'];
+      } else if (language === 'rust') {
+        cmd = ['sh', '-c', 'mkdir -p /tmp/rust-build && cp /code/main.rs /tmp/rust-build/ && cd /tmp/rust-build && rustc main.rs -o /tmp/rust-build/program && cat /code/input.txt | /tmp/rust-build/program'];
+      } else if (language === 'csharp') {
+        cmd = ['sh', '-c', 'mkdir -p /tmp/csharp-build && cp /code/Program.cs /tmp/csharp-build/ && cd /tmp/csharp-build && dotnet new console --force --output . && rm Program.cs && cp /tmp/csharp-build/Program.cs . && dotnet build -o /tmp/output && cat /code/input.txt | dotnet /tmp/output/*.dll'];
+      } else if (language === 'scala') {
+        cmd = ['sh', '-c', 'mkdir -p /tmp/scala-build && cp /code/Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cat /code/input.txt | java -cp /tmp/scala-build:/usr/share/scala/lib/* Main'];
       }
     }
 
-    // Language-specific memory limits (Dart VM and Java need more memory)
-    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 : 
-                       language === 'java' ? 256 * 1024 * 1024 :
-                       100 * 1024 * 1024;
+    // Language-specific memory limits (Dart VM, Java, Rust, C#, Scala need more memory)
+    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 :
+      language === 'java' ? 256 * 1024 * 1024 :
+        language === 'rust' ? 256 * 1024 * 1024 :
+          language === 'csharp' ? 256 * 1024 * 1024 :
+            language === 'scala' ? 256 * 1024 * 1024 :
+              100 * 1024 * 1024;
 
     // Set up container options with security constraints
     const containerOptions = {
@@ -336,27 +363,27 @@ function cleanDockerLogs(logs) {
   const bufferLogs = Buffer.from(logs);
   let position = 0;
   let cleanedLogs = '';
-  
+
   while (position < bufferLogs.length) {
     // Skip the 8-byte Docker header
     position += 8;
-    
+
     // Find the end of the current log line
     let endOfLine = position;
-    while (endOfLine < bufferLogs.length && 
-           !(bufferLogs[endOfLine] === 0x01 || bufferLogs[endOfLine] === 0x02) || 
-           endOfLine < position + 1) {
+    while (endOfLine < bufferLogs.length &&
+      !(bufferLogs[endOfLine] === 0x01 || bufferLogs[endOfLine] === 0x02) ||
+      endOfLine < position + 1) {
       endOfLine++;
     }
-    
+
     // Extract the log line without the header
     const logLine = bufferLogs.slice(position, endOfLine).toString('utf8');
     cleanedLogs += logLine;
-    
+
     // Move position to the next header
     position = endOfLine;
   }
-  
+
   return cleanedLogs;
 }
 
@@ -371,7 +398,10 @@ function detectInteractiveCode(language, code) {
     ruby: /\bgets\b|\breadline\b/i,
     go: /\bScan\b|\bReader\.ReadString\b|\bReader\.Read\b/i,
     dart: /\breadLineSync\b|\bstdin\.read/i,
-    php: /\bfgets\b|\breadline\b|\bSTDIN\b/i
+    php: /\bfgets\b|\breadline\b|\bSTDIN\b/i,
+    rust: /\breadline\b|\bstdin\(\)\.read_line\b/i,
+    csharp: /\bConsole\.ReadLine\b|\bConsole\.Read\b/i,
+    scala: /\bStdIn\.readLine\b|\bStdIn\.read/i
   };
 
   return patterns[language] && patterns[language].test(code);
@@ -446,7 +476,10 @@ async function executeCodeInteractive(language, code, socket) {
         language === 'c' ? 'main.c' :
           language === 'go' ? 'main.go' :
             language === 'dart' ? 'main.dart' :
-              `script${supportedLanguages[language].fileExtension}`;
+              language === 'rust' ? 'main.rs' :
+                language === 'csharp' ? 'Program.cs' :
+                  language === 'scala' ? 'Main.scala' :
+                    `script${supportedLanguages[language].fileExtension}`;
 
     const filePath = path.join(workDir, fileName);
     await fs.writeFile(filePath, code);
@@ -455,10 +488,13 @@ async function executeCodeInteractive(language, code, socket) {
 
     socket.emit('output', { data: '🚀 Starting execution...\n\n' });
 
-    // Language-specific memory limits (Dart VM needs more memory)
-    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 : 
-                       language === 'java' ? 256 * 1024 * 1024 :
-                       100 * 1024 * 1024;
+    // Language-specific memory limits (Dart VM, Java, Rust, C#, Scala need more memory)
+    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 :
+      language === 'java' ? 256 * 1024 * 1024 :
+        language === 'rust' ? 256 * 1024 * 1024 :
+          language === 'csharp' ? 256 * 1024 * 1024 :
+            language === 'scala' ? 256 * 1024 * 1024 :
+              100 * 1024 * 1024;
 
     // NO IMAGE BUILDING! Use volume mounts instead for speed
     const containerOptions = {
