@@ -452,7 +452,9 @@ async function executeCodeInteractive(language, code, socket) {
     };
 
     container = await docker.createContainer(containerOptions);
-    await container.start();
+
+    // Attach BEFORE starting to capture all output (prevents race condition
+    // where fast scripts exit before attach connects)
     stream = await container.attach({ stream: true, stdin: true, stdout: true, stderr: true, hijack: true });
 
     const stdout = new require('stream').PassThrough();
@@ -472,6 +474,19 @@ async function executeCodeInteractive(language, code, socket) {
         stream.write(inputData.data + '\n');
       }
     });
+
+    // When Docker closes stdout/stderr (process exited), close stdin so
+    // the container fully terminates and container.wait() can resolve.
+    // Without this, runtimes like Ruby that hold an open stdin reference
+    // will keep the container alive indefinitely.
+    stream.on('end', () => {
+      if (!stream.destroyed) {
+        stream.end();
+      }
+    });
+
+    // Start container after attach is ready
+    await container.start();
 
     const executionTimeout = setTimeout(async () => {
       try {
