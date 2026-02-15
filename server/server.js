@@ -77,6 +77,11 @@ const supportedLanguages = {
     image: 'code-execution-go:latest',
     fileExtension: '.go',
     command: ['go', 'run', 'main.go']  // Working dir is set, use relative paths
+  },
+  dart: {
+    image: 'code-execution-dart:latest',
+    fileExtension: '.dart',
+    command: ['dart', 'run', 'main.dart']  // Working dir is set, use relative paths
   }
 };
 
@@ -126,7 +131,8 @@ async function executeCode(language, code, input = '') {
     const fileName = language === 'java' ? 'Main.java' :
       language === 'cpp' ? 'main.cpp' :
         language === 'go' ? 'main.go' :
-          `script${supportedLanguages[language].fileExtension}`;
+          language === 'dart' ? 'main.dart' :
+            `script${supportedLanguages[language].fileExtension}`;
 
     // Write code to a file
     const filePath = path.join(workDir, fileName);
@@ -201,16 +207,23 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'cat /code/input.txt | python /code/script.py'];
       } else if (language === 'javascript') {
         cmd = ['sh', '-c', 'cat /code/input.txt | node /code/script.js'];
+      } else if (language === 'dart') {
+        cmd = ['sh', '-c', 'cat /code/input.txt | dart run /code/main.dart'];
       }
     }
+
+    // Language-specific memory limits (Dart VM and Java need more memory)
+    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 : 
+                       language === 'java' ? 256 * 1024 * 1024 :
+                       100 * 1024 * 1024;
 
     // Set up container options with security constraints
     const containerOptions = {
       Image: tmpImageName,
       Cmd: cmd,
       HostConfig: {
-        Memory: 100 * 1024 * 1024,
-        MemorySwap: 100 * 1024 * 1024,
+        Memory: memoryLimit,
+        MemorySwap: memoryLimit,
         NanoCpus: 1 * 1000000000,
         PidsLimit: 50,
         StopTimeout: 10,
@@ -340,7 +353,8 @@ function detectInteractiveCode(language, code) {
     java: /\bScanner\b|\bSystem\.console\(\)|\bBufferedReader\b/i,
     cpp: /\bcin\b|\bgetline\b|\bscanf\b/i,
     ruby: /\bgets\b|\breadline\b/i,
-    go: /\bScan\b|\bReader\.ReadString\b|\bReader\.Read\b/i
+    go: /\bScan\b|\bReader\.ReadString\b|\bReader\.Read\b/i,
+    dart: /\breadLineSync\b|\bstdin\.read/i
   };
 
   return patterns[language] && patterns[language].test(code);
@@ -413,7 +427,8 @@ async function executeCodeInteractive(language, code, socket) {
     const fileName = language === 'java' ? 'Main.java' :
       language === 'cpp' ? 'main.cpp' :
         language === 'go' ? 'main.go' :
-          `script${supportedLanguages[language].fileExtension}`;
+          language === 'dart' ? 'main.dart' :
+            `script${supportedLanguages[language].fileExtension}`;
 
     const filePath = path.join(workDir, fileName);
     await fs.writeFile(filePath, code);
@@ -422,13 +437,18 @@ async function executeCodeInteractive(language, code, socket) {
 
     socket.emit('output', { data: '🚀 Starting execution...\n\n' });
 
+    // Language-specific memory limits (Dart VM needs more memory)
+    const memoryLimit = language === 'dart' ? 256 * 1024 * 1024 : 
+                       language === 'java' ? 256 * 1024 * 1024 :
+                       100 * 1024 * 1024;
+
     // NO IMAGE BUILDING! Use volume mounts instead for speed
     const containerOptions = {
       Image: baseImage,  // Use pre-built base image directly
       Cmd: supportedLanguages[language].command,
       HostConfig: {
-        Memory: 100 * 1024 * 1024,
-        MemorySwap: 100 * 1024 * 1024,
+        Memory: memoryLimit,
+        MemorySwap: memoryLimit,
         NanoCpus: 1 * 1000000000,
         PidsLimit: 50,
         NetworkMode: 'none',

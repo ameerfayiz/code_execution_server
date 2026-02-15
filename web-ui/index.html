@@ -71,6 +71,7 @@
                     <option value="cpp">C++</option>
                     <option value="ruby">Ruby</option>
                     <option value="go">Go</option>
+                    <option value="dart">Dart</option>
                 </select>
             </div>
         </div>
@@ -168,6 +169,7 @@ readline.question('Enter your name: ', name => {
   console.log(\`Sum of numbers from 1 to 10: \${total}\`);
   
   readline.close();
+  process.stdin.unref(); // Allow process to exit when readline closes
 });`,
 
             java: `// Java Example
@@ -255,6 +257,24 @@ func main() {
 		total += i
 	}
 	fmt.Printf("Sum of numbers from 1 to 10: %d\\n", total)
+}`,
+
+            dart: `// Dart Example
+import 'dart:io';
+
+void main() {
+  print('Hello, World!');
+  
+  stdout.write('Enter your name: ');
+  String? name = stdin.readLineSync();
+  print('Hello, \${name ?? "User"}!');
+  
+  // Calculate the sum of numbers from 1 to 10
+  int total = 0;
+  for (int i = 1; i <= 10; i++) {
+    total += i;
+  }
+  print('Sum of numbers from 1 to 10: \$total');
 }`
         };
 
@@ -265,7 +285,8 @@ func main() {
             java: 'text/x-java',
             cpp: 'text/x-c++src',
             ruby: 'ruby',
-            go: 'go'
+            go: 'go',
+            dart: 'text/x-dart'
         };
 
         // Set initial code sample

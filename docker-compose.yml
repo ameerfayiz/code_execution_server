@@ -86,6 +86,16 @@ services:
     networks:
       - code-execution-network
 
+  # Dart execution environment
+  code-execution-dart:
+    build:
+      context: ./languages/dart
+      dockerfile: Dockerfile
+    image: code-execution-dart:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
 networks:
   code-execution-network:
     driver: bridge
