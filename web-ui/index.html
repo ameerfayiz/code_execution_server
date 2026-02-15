@@ -281,6 +281,7 @@ func main() {
         // Initialize Socket.IO
         const socket = io();
         let isExecuting = false;
+        let currentExecutionId = null;
 
         socket.on('connect', () => {
             console.log('Connected to server');
@@ -309,6 +310,7 @@ func main() {
 
         socket.on('execution-complete', (data) => {
             isExecuting = false;
+            currentExecutionId = null;
             const outputElement = document.getElementById('output');
             const runBtn = document.getElementById('run-btn');
             const stopBtn = document.getElementById('stop-btn');
@@ -333,6 +335,11 @@ func main() {
             const outputElement = document.getElementById('output');
             outputElement.appendChild(document.createTextNode(`\n❌ Error: ${data.message}\n`));
             isExecuting = false;
+            currentExecutionId = null;
+        });
+
+        socket.on('execution-start', (data) => {
+            currentExecutionId = data.executionId || null;
         });
 
         // Handle code execution
@@ -343,6 +350,7 @@ func main() {
             const runSpinner = document.getElementById('run-spinner');
             const stopBtn = document.getElementById('stop-btn');
             const inputContainer = document.getElementById('input-container');
+            const interactiveInput = document.getElementById('interactive-input');
 
             // Validate code
             if (!code.trim()) {
@@ -362,6 +370,8 @@ func main() {
             stopBtn.style.display = 'inline-block';
             inputContainer.style.display = 'block';
             isExecuting = true;
+            currentExecutionId = null;
+            interactiveInput.value = '';
 
             // Emit execution request
             socket.emit('execute-interactive', { language, code });
@@ -388,11 +398,11 @@ func main() {
         const sendInputBtn = document.getElementById('send-input-btn');
 
         function sendInput() {
-            if (!isExecuting) return;
+            if (!isExecuting || !currentExecutionId) return;
 
             const inputValue = interactiveInput.value;
             if (inputValue !== '') {
-                socket.emit('input', { data: inputValue });
+                socket.emit('input', { data: inputValue, executionId: currentExecutionId });
 
                 // Show input in output
                 const outputElement = document.getElementById('output');

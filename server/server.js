@@ -405,6 +405,7 @@ async function executeCodeInteractive(language, code, socket) {
   const workDir = path.join('/workdir', executionId);  // Use shared volume
   let container = null;
   let stream = null;
+  let inputHandler = null;
 
   try {
     await fs.mkdir(workDir, { recursive: true });
@@ -469,11 +470,18 @@ async function executeCodeInteractive(language, code, socket) {
       socket.emit('output', { data: chunk.toString('utf8'), type: 'stderr' });
     });
 
-    socket.on('input', (inputData) => {
-      if (stream && !stream.destroyed) {
-        stream.write(inputData.data + '\n');
-      }
-    });
+    // Bind input to this execution only to prevent stray/stale writes.
+    inputHandler = (inputData) => {
+      if (!stream || stream.destroyed) return;
+      if (!inputData || inputData.executionId !== executionId) return;
+      if (typeof inputData.data !== 'string' || inputData.data.length === 0) return;
+      stream.write(inputData.data + '\n');
+    };
+
+    socket.on('input', inputHandler);
+
+    // Tell the client which execution is active for input routing.
+    socket.emit('execution-start', { executionId });
 
     // When Docker closes stdout/stderr (process exited), close stdin so
     // the container fully terminates and container.wait() can resolve.
@@ -516,6 +524,9 @@ async function executeCodeInteractive(language, code, socket) {
     console.error(`[${new Date().toISOString()}] Error in interactive execution:`, error);
     throw error;
   } finally {
+    if (inputHandler) {
+      socket.off('input', inputHandler);
+    }
     if (stream && !stream.destroyed) {
       stream.end();
     }
