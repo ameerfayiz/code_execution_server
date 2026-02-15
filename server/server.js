@@ -68,6 +68,11 @@ const supportedLanguages = {
     fileExtension: '.cpp',
     command: ['sh', '-c', 'g++ -o /tmp/program main.cpp && /tmp/program']  // Compile to /tmp for write permissions
   },
+  c: {
+    image: 'code-execution-c:latest',
+    fileExtension: '.c',
+    command: ['sh', '-c', 'gcc -o /tmp/program main.c && /tmp/program']  // Compile to /tmp for write permissions
+  },
   ruby: {
     image: 'code-execution-ruby:latest',
     fileExtension: '.rb',
@@ -135,9 +140,10 @@ async function executeCode(language, code, input = '') {
     // Determine file name based on language
     const fileName = language === 'java' ? 'Main.java' :
       language === 'cpp' ? 'main.cpp' :
-        language === 'go' ? 'main.go' :
-          language === 'dart' ? 'main.dart' :
-            `script${supportedLanguages[language].fileExtension}`;
+        language === 'c' ? 'main.c' :
+          language === 'go' ? 'main.go' :
+            language === 'dart' ? 'main.dart' :
+              `script${supportedLanguages[language].fileExtension}`;
 
     // Write code to a file
     const filePath = path.join(workDir, fileName);
@@ -203,6 +209,8 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'cd /code && javac -d /tmp Main.java && cat input.txt | java -cp /tmp Main'];
       } else if (language === 'cpp') {
         cmd = ['sh', '-c', 'cd /code && g++ -o /tmp/program main.cpp && cat input.txt | /tmp/program'];
+      } else if (language === 'c') {
+        cmd = ['sh', '-c', 'cd /code && gcc -o /tmp/program main.c && cat input.txt | /tmp/program'];
       } else if (language === 'go') {
         // Fix for Go - ensure we're calling the shell correctly
         cmd = ['sh', '-c', 'cat /code/input.txt | go run /code/main.go'];
@@ -359,6 +367,7 @@ function detectInteractiveCode(language, code) {
     javascript: /\breadline\b|\bprocess\.stdin\b/i,
     java: /\bScanner\b|\bSystem\.console\(\)|\bBufferedReader\b/i,
     cpp: /\bcin\b|\bgetline\b|\bscanf\b/i,
+    c: /\bscanf\b|\bgetchar\b|\bfgets\b|\bgets\b/i,
     ruby: /\bgets\b|\breadline\b/i,
     go: /\bScan\b|\bReader\.ReadString\b|\bReader\.Read\b/i,
     dart: /\breadLineSync\b|\bstdin\.read/i,
@@ -434,9 +443,10 @@ async function executeCodeInteractive(language, code, socket) {
 
     const fileName = language === 'java' ? 'Main.java' :
       language === 'cpp' ? 'main.cpp' :
-        language === 'go' ? 'main.go' :
-          language === 'dart' ? 'main.dart' :
-            `script${supportedLanguages[language].fileExtension}`;
+        language === 'c' ? 'main.c' :
+          language === 'go' ? 'main.go' :
+            language === 'dart' ? 'main.dart' :
+              `script${supportedLanguages[language].fileExtension}`;
 
     const filePath = path.join(workDir, fileName);
     await fs.writeFile(filePath, code);

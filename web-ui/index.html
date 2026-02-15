@@ -69,6 +69,7 @@
                     <option value="javascript">JavaScript</option>
                     <option value="java">Java</option>
                     <option value="cpp">C++</option>
+                    <option value="c">C</option>
                     <option value="ruby">Ruby</option>
                     <option value="go">Go</option>
                     <option value="dart">Dart</option>
@@ -219,6 +220,30 @@ int main() {
     return 0;
 }`,
 
+            c: `// C Example
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    printf("Hello, World!\\n");
+    
+    char name[100];
+    printf("Enter your name: ");
+    fflush(stdout);
+    fgets(name, sizeof(name), stdin);
+    name[strcspn(name, "\\n")] = 0;  // Remove newline
+    printf("Hello, %s!\\n", name);
+    
+    // Calculate the sum of numbers from 1 to 10
+    int total = 0;
+    for (int i = 1; i <= 10; i++) {
+        total += i;
+    }
+    printf("Sum of numbers from 1 to 10: %d\\n", total);
+    
+    return 0;
+}`,
+
             ruby: `# Ruby Example
 # Disable output buffering for interactive input
 STDOUT.sync = true
@@ -302,6 +327,7 @@ echo "Sum of numbers from 1 to 10: " . $total . "\\n";
             javascript: 'javascript',
             java: 'text/x-java',
             cpp: 'text/x-c++src',
+            c: 'text/x-csrc',
             ruby: 'ruby',
             go: 'go',
             dart: 'text/x-dart',

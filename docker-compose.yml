@@ -66,6 +66,16 @@ services:
     networks:
       - code-execution-network
 
+  # C execution environment
+  code-execution-c:
+    build:
+      context: ./languages/c
+      dockerfile: Dockerfile
+    image: code-execution-c:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
   # Ruby execution environment
   code-execution-ruby:
     build:
