@@ -146,6 +146,16 @@ services:
     networks:
       - code-execution-network
 
+  # Octave execution environment
+  code-execution-octave:
+    build:
+      context: ./languages/octave
+      dockerfile: Dockerfile
+    image: code-execution-octave:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
 networks:
   code-execution-network:
     driver: bridge

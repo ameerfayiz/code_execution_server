@@ -107,6 +107,11 @@ const supportedLanguages = {
     image: 'code-execution-scala:latest',
     fileExtension: '.scala',
     command: ['sh', '-c', 'mkdir -p /tmp/scala-build && cp Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cd /tmp/scala-build && java -cp /tmp/scala-build:/usr/share/scala/lib/* Main']  // Compile with scalac then run with java
+  },
+  octave: {
+    image: 'code-execution-octave:latest',
+    fileExtension: '.m',
+    command: ['octave', '--no-gui', '--quiet', '--eval', 'source("script.m")']  // Run Octave script in batch mode
   }
 };
 
@@ -248,6 +253,8 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'mkdir -p /tmp/csharp-build && cp /code/Program.cs /tmp/csharp-build/ && cd /tmp/csharp-build && dotnet new console --force --output . && rm Program.cs && cp /tmp/csharp-build/Program.cs . && dotnet build -o /tmp/output && cat /code/input.txt | dotnet /tmp/output/*.dll'];
       } else if (language === 'scala') {
         cmd = ['sh', '-c', 'mkdir -p /tmp/scala-build && cp /code/Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cat /code/input.txt | java -cp /tmp/scala-build:/usr/share/scala/lib/* Main'];
+      } else if (language === 'octave') {
+        cmd = ['sh', '-c', 'cat /code/input.txt | octave --no-gui --quiet --eval "source(\"/code/script.m\")"'];
       }
     }
 
@@ -401,7 +408,8 @@ function detectInteractiveCode(language, code) {
     php: /\bfgets\b|\breadline\b|\bSTDIN\b/i,
     rust: /\breadline\b|\bstdin\(\)\.read_line\b/i,
     csharp: /\bConsole\.ReadLine\b|\bConsole\.Read\b/i,
-    scala: /\bStdIn\.readLine\b|\bStdIn\.read/i
+    scala: /\bStdIn\.readLine\b|\bStdIn\.read/i,
+    octave: /\binput\s*\(/i
   };
 
   return patterns[language] && patterns[language].test(code);
