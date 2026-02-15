@@ -112,6 +112,11 @@ const supportedLanguages = {
     image: 'code-execution-octave:latest',
     fileExtension: '.m',
     command: ['octave', '--no-gui', '--quiet', '--eval', 'source("script.m")']  // Run Octave script in batch mode
+  },
+  assembly: {
+    image: 'code-execution-assembly:latest',
+    fileExtension: '.asm',
+    command: ['sh', '-c', 'mkdir -p /tmp/asm-build && cp script.asm /tmp/asm-build/ && cd /tmp/asm-build && nasm -f elf64 script.asm -o program.o && ld program.o -o program && ./program']  // Assemble, link, and run
   }
 };
 
@@ -255,6 +260,8 @@ async function executeCode(language, code, input = '') {
         cmd = ['sh', '-c', 'mkdir -p /tmp/scala-build && cp /code/Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cat /code/input.txt | java -cp /tmp/scala-build:/usr/share/scala/lib/* Main'];
       } else if (language === 'octave') {
         cmd = ['sh', '-c', 'cat /code/input.txt | octave --no-gui --quiet --eval "source(\"/code/script.m\")"'];
+      } else if (language === 'assembly') {
+        cmd = ['sh', '-c', 'mkdir -p /tmp/asm-build && cp /code/script.asm /tmp/asm-build/ && cd /tmp/asm-build && nasm -f elf64 script.asm -o program.o && ld program.o -o program && cat /code/input.txt | ./program'];
       }
     }
 
@@ -420,7 +427,8 @@ function detectInteractiveCode(language, code) {
     rust: /\breadline\b|\bstdin\(\)\.read_line\b/i,
     csharp: /\bConsole\.ReadLine\b|\bConsole\.Read\b/i,
     scala: /\bStdIn\.readLine\b|\bStdIn\.read/i,
-    octave: /\binput\s*\(/i
+    octave: /\binput\s*\(/i,
+    assembly: /\bread\b|\bsys_read\b|\bmov\s+rax\s*,\s*0\b/i
   };
 
   return patterns[language] && patterns[language].test(code);

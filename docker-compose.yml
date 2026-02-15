@@ -156,6 +156,16 @@ services:
     networks:
       - code-execution-network
 
+  # Assembly execution environment
+  code-execution-assembly:
+    build:
+      context: ./languages/assembly
+      dockerfile: Dockerfile
+    image: code-execution-assembly:latest
+    restart: "no"
+    networks:
+      - code-execution-network
+
 networks:
   code-execution-network:
     driver: bridge

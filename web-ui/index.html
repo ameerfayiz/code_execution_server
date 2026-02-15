@@ -78,6 +78,7 @@
                     <option value="csharp">C#</option>
                     <option value="scala">Scala</option>
                     <option value="octave">Octave</option>
+                    <option value="assembly">Assembly (NASM x86_64)</option>
                 </select>
             </div>
         </div>
@@ -395,7 +396,29 @@ fprintf('Sum of numbers from 1 to 10: %d\\n', total);
 vec = [1, 2, 3, 4, 5];
 mat = magic(3);
 disp('Magic 3x3 matrix:');
-disp(mat);`
+disp(mat);`,
+
+            assembly: `; NASM x86_64 Linux Example
+; Assemble: nasm -f elf64 script.asm
+; Link:     ld program.o -o program
+
+section .data
+    msg db "Hello, World!", 10
+    len equ $-msg
+
+section .text
+    global _start
+
+_start:
+    mov rax, 1          ; sys_write
+    mov rdi, 1          ; stdout
+    mov rsi, msg
+    mov rdx, len
+    syscall
+
+    mov rax, 60         ; sys_exit
+    xor rdi, rdi
+    syscall`
         };
 
         // Language mode mapping
@@ -412,7 +435,8 @@ disp(mat);`
             rust: 'text/x-rustsrc',
             csharp: 'text/x-csharp',
             scala: 'text/x-scala',
-            octave: 'text/x-octave'
+            octave: 'text/x-octave',
+            assembly: 'text/x-gas'
         };
 
         // Set initial code sample
