@@ -101,7 +101,7 @@ const supportedLanguages = {
   csharp: {
     image: 'code-execution-csharp:latest',
     fileExtension: '.cs',
-    command: ['sh', '-c', 'mkdir -p /tmp/csharp-build && cp Program.cs /tmp/csharp-build/ && cd /tmp/csharp-build && dotnet new console --force --output . && rm Program.cs && cp /tmp/csharp-build/Program.cs . && dotnet build -o /tmp/output && dotnet /tmp/output/*.dll']  // Build to /tmp for write permissions
+    command: ['sh', '-c', 'rm -rf /tmp/csharp-app /tmp/output && mkdir -p /tmp/csharp-app /tmp/output && touch /tmp/csharp-build.log && dotnet new console --force --output /tmp/csharp-app >/dev/null && cp Program.cs /tmp/csharp-app/Program.cs && dotnet build /tmp/csharp-app -nologo -v q -o /tmp/output >/tmp/csharp-build.log 2>&1 || (if [ -s /tmp/csharp-build.log ]; then cat /tmp/csharp-build.log; fi; exit 1) && dotnet /tmp/output/*.dll']  // Build to /tmp for write permissions, hide build noise
   },
   scala: {
     image: 'code-execution-scala:latest',
@@ -250,7 +250,7 @@ async function executeCode(language, code, input = '') {
       } else if (language === 'rust') {
         cmd = ['sh', '-c', 'mkdir -p /tmp/rust-build && cp /code/main.rs /tmp/rust-build/ && cd /tmp/rust-build && rustc main.rs -o /tmp/rust-build/program && cat /code/input.txt | /tmp/rust-build/program'];
       } else if (language === 'csharp') {
-        cmd = ['sh', '-c', 'mkdir -p /tmp/csharp-build && cp /code/Program.cs /tmp/csharp-build/ && cd /tmp/csharp-build && dotnet new console --force --output . && rm Program.cs && cp /tmp/csharp-build/Program.cs . && dotnet build -o /tmp/output && cat /code/input.txt | dotnet /tmp/output/*.dll'];
+        cmd = ['sh', '-c', 'rm -rf /tmp/csharp-app /tmp/output && mkdir -p /tmp/csharp-app /tmp/output && touch /tmp/csharp-build.log && dotnet new console --force --output /tmp/csharp-app >/dev/null && cp /code/Program.cs /tmp/csharp-app/Program.cs && dotnet build /tmp/csharp-app -nologo -v q -o /tmp/output >/tmp/csharp-build.log 2>&1 || (if [ -s /tmp/csharp-build.log ]; then cat /tmp/csharp-build.log; fi; exit 1) && cat /code/input.txt | dotnet /tmp/output/*.dll'];
       } else if (language === 'scala') {
         cmd = ['sh', '-c', 'mkdir -p /tmp/scala-build && cp /code/Main.scala /tmp/scala-build/ && cd /tmp/scala-build && scalac -d /tmp/scala-build Main.scala && cat /code/input.txt | java -cp /tmp/scala-build:/usr/share/scala/lib/* Main'];
       } else if (language === 'octave') {
